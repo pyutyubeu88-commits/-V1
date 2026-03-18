@@ -602,7 +602,8 @@ async function generate(){
 }
 
 function renderReplies(replies){
-  var tags=['rt1','rt2','rt3'],showPost=gToken&&lastSelectedCommentId;
+  var tags=['rt1','rt2','rt3'],showPost=!!lastSelectedCommentId;
+
   document.getElementById('rcards').innerHTML=replies.map(function(r,i){
     return'<div class="rcard"><span class="rtag '+tags[i]+'">'+r.label+'</span>'
     +'<div class="rtxt" id="rt'+i+'">'+esc(r.text)+'</div>'
@@ -703,7 +704,23 @@ async function startBulk(){
 }
 
 function renderBulkTable(){
-  var sp=!!gToken;
+  document.getElementById('btbody').innerHTML=bulkResults.map(function(r,i){
+    return'<tr class="'+(r.ok?'bdone':'')+'">'
+    +'<td style="color:var(--tx2);font-size:11px">'+(i+1)+'</td>'
+    +'<td style="color:var(--blu);font-size:12px;font-weight:700;white-space:nowrap">@'+esc(r.cmt.author)+'</td>'
+    +'<td style="color:var(--tx2);font-size:12px;max-width:180px">'+esc(r.cmt.text.substring(0,60))+(r.cmt.text.length>60?'…':'')+'</td>'
+    +'<td style="max-width:300px;font-size:13px;line-height:1.7" id="brt'+i+'">'+esc(r.reply)+'</td>'
+    +'<td style="white-space:nowrap">'+(r.ok
+      ?'<button class="bcpy" id="bpost'+i+'" onclick="postBulkRow('+i+')" style="border-color:rgba(16,185,129,.4);color:var(--grn)'+(r.posted?';background:rgba(16,185,129,.08)':'')+'">'+(r.posted?'✅ 게시됨':'▶ 게시')+'</button>'
+      +'<button class="bcpy" id="bcp'+i+'" onclick="copyBulk('+i+')">📋 복사</button>'
+      +'<button class="bmk '+(repliedSet.has(r.cmt.id)?'done':'')+'" id="bmk'+i+'" onclick="markBulk('+i+')">'+(repliedSet.has(r.cmt.id)?'✓ 완료':'○ 완료')+'</button>'
+      :'<span style="color:var(--red);font-size:11px">오류</span>')+'</td></tr>';
+  }).join('');
+  document.getElementById('bulkRes').classList.add('on');
+  document.getElementById('bulkSub').textContent=bulkResults.filter(function(r){return r.ok;}).length+'개 생성 완료';
+  document.getElementById('postAllBtn').style.display='block';
+}
+
   document.getElementById('btbody').innerHTML=bulkResults.map(function(r,i){
     return'<tr class="'+(r.ok?'bdone':'')+'">'
     +'<td style="color:var(--tx2);font-size:11px">'+(i+1)+'</td>'
