@@ -577,6 +577,8 @@ function renderAnalysis(a){
 
 async function generate(){
   var cmt=getComment(),script=getScript();
+function getAuthor(){if(curMode==='url'){if(pasteMode)return pasteData.author||'시청자';return selIdx>=0&&allCmts[selIdx]?allCmts[selIdx].author:'시청자';}return'시청자';}
+
   if(!cmt){showErr('댓글을 선택하거나 입력해 주세요.');return;}
   if(!script){showErr(curMode==='url'?'영상을 먼저 불러와 주세요.':'영상 내용을 입력해 주세요.');return;}
   if(!gmKey){showErr('Gemini API 키를 설정해 주세요.');toggleCard('gm');return;}
@@ -587,10 +589,13 @@ async function generate(){
     if(!analysis){analysis=await analyzeOnly();if(analysis)renderAnalysis(analysis);}
     var a=analysis||{recommendedStyle:'따뜻한 존댓말',typeLabel:'일반댓글',isTroll:false,trollLevel:0};
     var chn=document.getElementById('chnName').value.trim();
+       var author=getAuthor();
     var prompt='한국 시니어 유튜브 채널 댓글 관리자. 대댓글 3가지.\n말투:'+a.recommendedStyle+'/4~5문장/한국어\n'
       +(chn?'채널:'+chn+' (서명)\n':'')+(a.isTroll?'⚠️악성도'+a.trollLevel+'\n':'')
-      +'\n[영상]\n'+script.substring(0,600)+'\n\n[댓글-'+a.typeLabel+']\n'+cmt
-      +'\n\n닉네임있으면"○○님!"시작. JSON만:{"replies":[{"label":"감성형","tag":"1","text":"..."},{"label":"정보형","tag":"2","text":"..."},{"label":"소통형","tag":"3","text":"..."}]}';
+      +'\n[영상]\n'+script.substring(0,600)+'\n\n[댓글-'+a.typeLabel+', 작성자: '+author+']\n'+cmt
+      +'\n\n반드시 "'+author+'님!" 으로 시작하세요. OO님 또는 ○○님은 절대 금지. JSON만:'
+      +'{"replies":[{"label":"감성형","tag":"1","text":"..."},{"label":"정보형","tag":"2","text":"..."},{"label":"소통형","tag":"3","text":"..."}]}';
+
     var raw=await callGemini(prompt);
     var parsed=JSON.parse(safeJSON(raw));
     renderReplies(parsed.replies);
