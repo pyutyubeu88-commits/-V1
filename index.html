@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI 자동 대댓글 생성기</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" as="style" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <style>
@@ -406,6 +407,30 @@ input:focus,textarea:focus{outline:none;border-color:rgba(108,99,255,.5);box-sha
     </div>
   </div>
 
+
+  <!-- ★ Google 계정 연결 -->
+  <div class="card" id="oauthCard" style="margin-bottom:14px">
+    <div class="card-head" style="cursor:default">
+      <div class="card-title">
+        <span class="dot" id="oauthDot"></span>
+        🔐 Google 계정 연결
+        <span style="font-size:10px;color:var(--tx2);font-weight:400;margin-left:4px">(YouTube 직접 게시용)</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="gLoginBtn" onclick="gLogin()" style="display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:#fff;color:#3c4043;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:all .2s">
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Google 로그인
+        </button>
+        <button id="gOutBtn" onclick="gLogout()" style="display:none;padding:7px 14px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--tx2);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">로그아웃</button>
+      </div>
+    </div>
+    <div id="oauthInfo" style="margin-top:12px;display:none;align-items:center;gap:10px;font-size:13px;color:var(--tx2)">
+      <img id="oauthAvatar" src="" style="width:32px;height:32px;border-radius:50%;object-fit:cover">
+      <span id="oauthName" style="font-weight:700;color:var(--txt)"></span>
+      <span style="color:var(--grn)">✅ YouTube 직접 게시 가능</span>
+    </div>
+  </div>
+
   <div style="margin-bottom:22px"></div>
 
   <!-- 모드 탭 -->
@@ -555,6 +580,7 @@ input:focus,textarea:focus{outline:none;border-color:rgba(108,99,255,.5);box-sha
     <div class="bulk-res" id="bulkRes">
       <div class="bulk-toolbar">
         <div class="bulk-ttl">📋 생성 결과</div>
+        <button class="tbtn" id="postAllBtn" style="display:none;border:1px solid rgba(16,185,129,.5);background:rgba(16,185,129,.1);color:var(--grn)" onclick="postAllBulk()">▶ 전체 YouTube 게시</button>
         <button class="tbtn tbtn-pur" onclick="copyAll()">📄 전체 복사</button>
         <button class="tbtn tbtn-grn" onclick="exportCSV()">⬇️ CSV 저장</button>
       </div>
@@ -841,6 +867,7 @@ function renderReplies(replies) {
       +'<div class="ract">'
       +'<button class="cbtn" id="cb'+i+'" onclick="copyR('+i+')">📋 복사</button>'
       +'<button class="cbtn" onclick="selAll(\'rt'+i+'\')">🖱️ 전체선택</button>'
+      +'<button class="cbtn" id="pb'+i+'" onclick="postSingle('+i+')" style="display:none;border-color:rgba(16,185,129,.4);color:var(--grn)">▶ YouTube 게시</button>'
       +'</div></div>';
   }).join('');
   document.getElementById('results').classList.add('on');
@@ -900,7 +927,8 @@ function renderBulkTable() {
       +'<td style="color:var(--tx2);font-size:12px;max-width:180px">'+esc(r.cmt.text.substring(0,60))+(r.cmt.text.length>60?'…':'')+'</td>'
       +'<td style="max-width:300px;font-size:13px;line-height:1.7" id="brt'+i+'">'+esc(r.reply)+'</td>'
       +'<td style="white-space:nowrap">'
-      +(r.ok?'<button class="bcpy" id="bcp'+i+'" onclick="copyBulk('+i+')">📋 복사</button>'
+      +(r.ok?'<button class="cbtn" id="bpost'+i+'" onclick="postBulkRow('+i+')" style="display:none;border-color:rgba(16,185,129,.4);color:var(--grn);width:100%;justify-content:center;margin-bottom:5px">▶ YouTube 게시</button>'
+      +'<button class="bcpy" id="bcp'+i+'" onclick="copyBulk('+i+')">📋 복사</button>'
       +'<button class="bmk '+(repliedSet.has(r.cmt.id)?'done':'')+'" id="bmk'+i+'" onclick="markBulk('+i+')">'+(repliedSet.has(r.cmt.id)?'✓ 게시완료':'○ 게시완료')+'</button>':'')
       +'</td></tr>';
   }).join('');
@@ -997,6 +1025,134 @@ function renderTut(){
 }
 document.getElementById('tutSkip').onclick=closeTut;
 document.getElementById('tutNext').onclick=function(){ if(tIdx<TSTEPS.length-1){tIdx++;renderTut();}else{closeTut();} };
+
+// ===== Google OAuth (GIS TokenClient) =====
+var gToken = null;
+
+function gLogin() {
+  if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+    showErr('Google 인증 라이브러리 로딩 중입니다. 잠시 후 다시 시도해 주세요.');
+    return;
+  }
+  // 941692480971 프로젝트 클라이언트 ID (Vercel 도메인 등록됨)
+  var cid = atob('OTQxNjkyNDgwOTcxLW80cmxzMXZqcnJvY3NlMTI4ZjFxZTVocWxvdTN0aGQzLmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29t');
+  var client = google.accounts.oauth2.initTokenClient({
+    client_id: cid,
+    scope: 'https://www.googleapis.com/auth/youtube.force-ssl',
+    callback: function(resp) {
+      if (resp.error) { showErr('로그인 실패: ' + resp.error); return; }
+      gToken = resp.access_token;
+      // 프로필 조회
+      fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: 'Bearer ' + gToken }
+      }).then(function(r){ return r.json(); }).then(function(u) {
+        // UI 업데이트
+        document.getElementById('oauthDot').classList.add('on');
+        document.getElementById('oauthCard').classList.add('ok');
+        document.getElementById('gLoginBtn').style.display = 'none';
+        document.getElementById('gOutBtn').style.display = 'block';
+        var info = document.getElementById('oauthInfo');
+        info.style.display = 'flex';
+        if (u.picture) document.getElementById('oauthAvatar').src = u.picture;
+        document.getElementById('oauthName').textContent = u.name || u.email || '';
+        // 모든 게시 버튼 표시
+        document.querySelectorAll('[id^="pb"]').forEach(function(b){ b.style.display='flex'; });
+        document.querySelectorAll('[id^="bpost"]').forEach(function(b){ b.style.display='flex'; });
+        var pab = document.getElementById('postAllBtn');
+        if (pab) pab.style.display = 'block';
+        showInfo('✅ Google 로그인 성공! 이제 YouTube에 직접 게시할 수 있습니다.');
+      }).catch(function(e){ showErr('프로필 오류: ' + e.message); });
+    },
+    error_callback: function(err) {
+      showErr('로그인 오류: ' + (err.message || err.type || JSON.stringify(err)));
+    }
+  });
+  client.requestAccessToken({ prompt: 'select_account' });
+}
+
+function gLogout() {
+  gToken = null;
+  document.getElementById('oauthDot').classList.remove('on');
+  document.getElementById('oauthCard').classList.remove('ok');
+  document.getElementById('gLoginBtn').style.display = 'flex';
+  document.getElementById('gOutBtn').style.display = 'none';
+  document.getElementById('oauthInfo').style.display = 'none';
+  document.querySelectorAll('[id^="pb"]').forEach(function(b){ b.style.display='none'; });
+  document.querySelectorAll('[id^="bpost"]').forEach(function(b){ b.style.display='none'; });
+  var pab = document.getElementById('postAllBtn');
+  if (pab) pab.style.display = 'none';
+}
+
+// ===== YouTube 댓글 게시 (Vercel 서버리스 경유) =====
+async function postToYT(parentId, text) {
+  if (!gToken) throw new Error('Google 로그인이 필요합니다.');
+  var res = await fetch('/api/post-comment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ parentId: parentId, text: text, accessToken: gToken })
+  });
+  var data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+// 개별 게시 (결과 카드)
+async function postSingle(i) {
+  if (!gToken) { showErr('먼저 Google 계정을 연결해 주세요.'); return; }
+  var cmtId = (curMode === 'url' && !pasteMode && selIdx >= 0 && allCmts[selIdx]) ? allCmts[selIdx].id : null;
+  if (!cmtId) { showErr('게시할 댓글 ID를 찾을 수 없습니다. 댓글을 다시 클릭해 주세요.'); return; }
+  var txt = document.getElementById('rt' + i) ? document.getElementById('rt' + i).innerText.trim() : '';
+  if (!txt) return;
+  var btn = document.getElementById('pb' + i);
+  btn.disabled = true; btn.textContent = '게시 중...';
+  try {
+    await postToYT(cmtId, txt);
+    btn.textContent = '✅ 게시됨';
+    btn.style.background = 'rgba(16,185,129,.15)';
+    repliedSet.add(cmtId);
+    localStorage.setItem('_rs', JSON.stringify([...repliedSet]));
+    renderCmts();
+    showInfo('✅ YouTube에 댓글이 게시됐습니다!');
+  } catch(e) {
+    btn.disabled = false; btn.textContent = '▶ YouTube 게시';
+    showErr('게시 실패: ' + e.message);
+  }
+}
+
+// 일괄 행 게시
+async function postBulkRow(i) {
+  if (!gToken) { showErr('먼저 Google 계정을 연결해 주세요.'); return; }
+  var r = bulkResults[i];
+  if (!r || !r.ok || !r.cmt.id) return;
+  var btn = document.getElementById('bpost' + i);
+  btn.disabled = true; btn.textContent = '게시 중...';
+  try {
+    await postToYT(r.cmt.id, r.reply);
+    r.posted = true;
+    btn.textContent = '✅ 게시됨';
+    btn.style.background = 'rgba(16,185,129,.15)';
+    repliedSet.add(r.cmt.id);
+    localStorage.setItem('_rs', JSON.stringify([...repliedSet]));
+    renderCmts();
+  } catch(e) {
+    btn.disabled = false; btn.textContent = '▶ YouTube 게시';
+    showErr('게시 실패 (#' + (i+1) + '): ' + e.message);
+  }
+}
+
+// 전체 일괄 게시
+async function postAllBulk() {
+  if (!gToken) { showErr('먼저 Google 계정을 연결해 주세요.'); return; }
+  var pending = bulkResults.filter(function(r){ return r.ok && !r.posted && r.cmt.id; });
+  if (!pending.length) { showErr('게시할 항목이 없습니다.'); return; }
+  if (!confirm(pending.length + '개 댓글을 YouTube에 실제로 게시합니다.\n계속하시겠습니까?')) return;
+  for (var i = 0; i < pending.length; i++) {
+    await postBulkRow(bulkResults.indexOf(pending[i]));
+    await sleep(1200);
+  }
+  showInfo('✅ 일괄 게시 완료!');
+}
+
 </script>
 </body>
 </html>
