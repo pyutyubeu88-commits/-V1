@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI 자동 대댓글 생성기</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" as="style" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <style>
@@ -1026,48 +1025,78 @@ function renderTut(){
 document.getElementById('tutSkip').onclick=closeTut;
 document.getElementById('tutNext').onclick=function(){ if(tIdx<TSTEPS.length-1){tIdx++;renderTut();}else{closeTut();} };
 
-// ===== Google OAuth (GIS TokenClient) =====
+// ===== Google OAuth (Implicit Flow — 팝업 방식) =====
 var gToken = null;
+var _oauthTimer = null;
 
 function gLogin() {
-  if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
-    showErr('Google 인증 라이브러리 로딩 중입니다. 잠시 후 다시 시도해 주세요.');
+  var cid = '1019772443026-ukpf2otutbijqvuis49je2uudgfs9ngm.apps.googleusercontent.com';
+  var scope = 'https://www.googleapis.com/auth/youtube.force-ssl';
+  var redirectUri = window.location.origin + '/oauth-callback';
+  
+  // 현재 origin을 state로 저장
+  var state = Math.random().toString(36).substring(2);
+  sessionStorage.setItem('oauth_state', state);
+  
+  var authUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
+    + '?client_id=' + encodeURIComponent(cid)
+    + '&redirect_uri=' + encodeURIComponent(window.location.origin)
+    + '&response_type=token'
+    + '&scope=' + encodeURIComponent(scope)
+    + '&state=' + state
+    + '&prompt=select_account';
+
+  // 팝업창 열기
+  var w = 500, h = 620;
+  var left = (screen.width - w) / 2;
+  var top = (screen.height - h) / 2;
+  var popup = window.open(authUrl, 'google_oauth',
+    'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes');
+
+  if (!popup) {
+    showErr('팝업이 차단됐습니다. 브라우저 팝업 허용 후 다시 시도해 주세요.');
     return;
   }
-  // 941692480971 프로젝트 클라이언트 ID (Vercel 도메인 등록됨)
-  var cid = atob('OTQxNjkyNDgwOTcxLW80cmxzMXZqcnJvY3NlMTI4ZjFxZTVocWxvdTN0aGQzLmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29t');
-  var client = google.accounts.oauth2.initTokenClient({
-    client_id: cid,
-    scope: 'https://www.googleapis.com/auth/youtube.force-ssl',
-    callback: function(resp) {
-      if (resp.error) { showErr('로그인 실패: ' + resp.error); return; }
-      gToken = resp.access_token;
-      // 프로필 조회
-      fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: 'Bearer ' + gToken }
-      }).then(function(r){ return r.json(); }).then(function(u) {
-        // UI 업데이트
-        document.getElementById('oauthDot').classList.add('on');
-        document.getElementById('oauthCard').classList.add('ok');
-        document.getElementById('gLoginBtn').style.display = 'none';
-        document.getElementById('gOutBtn').style.display = 'block';
-        var info = document.getElementById('oauthInfo');
-        info.style.display = 'flex';
-        if (u.picture) document.getElementById('oauthAvatar').src = u.picture;
-        document.getElementById('oauthName').textContent = u.name || u.email || '';
-        // 모든 게시 버튼 표시
-        document.querySelectorAll('[id^="pb"]').forEach(function(b){ b.style.display='flex'; });
-        document.querySelectorAll('[id^="bpost"]').forEach(function(b){ b.style.display='flex'; });
-        var pab = document.getElementById('postAllBtn');
-        if (pab) pab.style.display = 'block';
-        showInfo('✅ Google 로그인 성공! 이제 YouTube에 직접 게시할 수 있습니다.');
-      }).catch(function(e){ showErr('프로필 오류: ' + e.message); });
-    },
-    error_callback: function(err) {
-      showErr('로그인 오류: ' + (err.message || err.type || JSON.stringify(err)));
-    }
-  });
-  client.requestAccessToken({ prompt: 'select_account' });
+
+  // 팝업에서 토큰 수신 대기
+  clearInterval(_oauthTimer);
+  _oauthTimer = setInterval(function() {
+    try {
+      if (!popup || popup.closed) {
+        clearInterval(_oauthTimer);
+        return;
+      }
+      var hash = popup.location.hash || popup.location.search;
+      if (hash && hash.includes('access_token')) {
+        clearInterval(_oauthTimer);
+        popup.close();
+        var params = new URLSearchParams(hash.replace('#','?').replace(/^\?/,''));
+        var token = params.get('access_token') || new URLSearchParams(hash.slice(1)).get('access_token');
+        if (token) { gToken = token; onGoogleLogin(); }
+        else showErr('토큰을 받지 못했습니다. 다시 시도해 주세요.');
+      }
+    } catch(e) { /* cross-origin 대기 중 */ }
+  }, 500);
+}
+
+function onGoogleLogin() {
+  fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { Authorization: 'Bearer ' + gToken }
+  }).then(function(r){ return r.json(); }).then(function(u) {
+    document.getElementById('oauthDot').classList.add('on');
+    document.getElementById('oauthCard').classList.add('ok');
+    document.getElementById('gLoginBtn').style.display = 'none';
+    document.getElementById('gOutBtn').style.display = 'block';
+    var info = document.getElementById('oauthInfo');
+    info.style.display = 'flex';
+    if (u.picture) document.getElementById('oauthAvatar').src = u.picture;
+    document.getElementById('oauthName').textContent = u.name || u.email || '';
+    document.querySelectorAll('[id^="pb"]').forEach(function(b){ b.style.display='flex'; });
+    document.querySelectorAll('[id^="bpost"]').forEach(function(b){ b.style.display='flex'; });
+    var pab = document.getElementById('postAllBtn');
+    if (pab) pab.style.display = 'block';
+    showInfo('✅ Google 로그인 성공! YouTube에 직접 게시할 수 있습니다.');
+  }).catch(function(e){ showErr('프로필 오류: ' + e.message); });
 }
 
 function gLogout() {
@@ -1083,6 +1112,27 @@ function gLogout() {
   if (pab) pab.style.display = 'none';
 }
 
+// 팝업 콜백 수신 (현재 페이지가 리디렉션 대상일 때)
+(function checkOAuthCallback() {
+  var hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    var params = new URLSearchParams(hash.slice(1));
+    var token = params.get('access_token');
+    if (token) {
+      // 팝업이면 opener에 전달
+      if (window.opener) {
+        window.opener.location.hash = hash;
+        window.close();
+      } else {
+        gToken = token;
+        window.history.replaceState(null, '', window.location.pathname);
+        onGoogleLogin();
+      }
+    }
+  }
+})();
+
+// ===== YouTube 댓글 게시
 // ===== YouTube 댓글 게시 (Vercel 서버리스 경유) =====
 async function postToYT(parentId, text) {
   if (!gToken) throw new Error('Google 로그인이 필요합니다.');
