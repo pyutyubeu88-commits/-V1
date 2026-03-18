@@ -866,7 +866,7 @@ function renderReplies(replies) {
       +'<div class="ract">'
       +'<button class="cbtn" id="cb'+i+'" onclick="copyR('+i+')">📋 복사</button>'
       +'<button class="cbtn" onclick="selAll(\'rt'+i+'\')">🖱️ 전체선택</button>'
-      +'<button class="cbtn" id="pb'+i+'" onclick="postSingle('+i+')" style="display:none;border-color:rgba(16,185,129,.4);color:var(--grn)">▶ YouTube 게시</button>'
+      +'<button class="cbtn" id="pb'+i+'" onclick="postSingle('+i+')" style="display:'+(gToken?'flex':'none')+';border-color:rgba(16,185,129,.4);color:var(--grn)">▶ YouTube 게시</button>'
       +'</div></div>';
   }).join('');
   document.getElementById('results').classList.add('on');
@@ -926,13 +926,16 @@ function renderBulkTable() {
       +'<td style="color:var(--tx2);font-size:12px;max-width:180px">'+esc(r.cmt.text.substring(0,60))+(r.cmt.text.length>60?'…':'')+'</td>'
       +'<td style="max-width:300px;font-size:13px;line-height:1.7" id="brt'+i+'">'+esc(r.reply)+'</td>'
       +'<td style="white-space:nowrap">'
-      +(r.ok?'<button class="cbtn" id="bpost'+i+'" onclick="postBulkRow('+i+')" style="display:none;border-color:rgba(16,185,129,.4);color:var(--grn);width:100%;justify-content:center;margin-bottom:5px">▶ YouTube 게시</button>'
+      +(r.ok?'<button class="cbtn" id="bpost'+i+'" onclick="postBulkRow('+i+')" style="display:'+(gToken?'flex':'none')+';border-color:rgba(16,185,129,.4);color:var(--grn);width:100%;justify-content:center;margin-bottom:5px">'+(r.posted?'✅ 게시됨':'▶ YouTube 게시')+'</button>'
       +'<button class="bcpy" id="bcp'+i+'" onclick="copyBulk('+i+')">📋 복사</button>'
       +'<button class="bmk '+(repliedSet.has(r.cmt.id)?'done':'')+'" id="bmk'+i+'" onclick="markBulk('+i+')">'+(repliedSet.has(r.cmt.id)?'✓ 게시완료':'○ 게시완료')+'</button>':'')
       +'</td></tr>';
   }).join('');
   document.getElementById('bulkRes').classList.add('on');
   document.getElementById('bulkSub').textContent=bulkResults.filter(function(r){return r.ok;}).length+'개 생성 완료';
+  // 로그인 상태면 전체 게시 버튼 표시
+  var pab = document.getElementById('postAllBtn');
+  if (pab) pab.style.display = gToken ? 'block' : 'none';
 }
 async function copyBulk(i) {
   var btn=document.getElementById('bcp'+i);
@@ -1096,6 +1099,14 @@ function onGoogleLogin() {
     var pab = document.getElementById('postAllBtn');
     if (pab) pab.style.display = 'block';
     showInfo('✅ Google 로그인 성공! YouTube에 직접 게시할 수 있습니다.');
+    // 이미 생성된 결과가 있으면 게시 버튼 즉시 표시
+    if (bulkResults && bulkResults.length > 0) renderBulkTable();
+    document.querySelectorAll('[id^="pb"]').forEach(function(b){ b.style.display='flex'; });
+    var pab=document.getElementById('postAllBtn'); if(pab) pab.style.display='block';
+    // 이미 생성된 결과가 있으면 게시 버튼 갱신
+    if (bulkResults.length > 0) renderBulkTable();
+    // 개별 결과 카드 게시 버튼도 표시
+    document.querySelectorAll('[id^="pb"]').forEach(function(b){ b.style.display='flex'; });
   }).catch(function(e){ showErr('프로필 오류: ' + e.message); });
 }
 
