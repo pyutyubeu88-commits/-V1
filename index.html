@@ -899,7 +899,7 @@ async function startBulk() {
     try {
       var aRaw=await callGemini('유튜브 댓글 분석 JSON만:\n댓글:"'+cmt.text.substring(0,200)+'"\n{"type":"general","typeLabel":"일반댓글","emotion":"긍정","emotionEmoji":"😊","recommendedStyle":"따뜻한 존댓말","isTroll":false,"trollLevel":0}');
       var a=JSON.parse(safeJSON(aRaw));
-      var rRaw=await callGemini('한국 시니어 유튜브 채널 댓글 관리자. 대댓글 1개.\n말투:'+a.recommendedStyle+'/3~4문장/한국어\n'+(chn?'채널:'+chn+'\n':'')+(a.isTroll?'악성도'+a.trollLevel+'\n':'')+'[영상]'+script.substring(0,300)+'\n[댓글@'+cmt.author+']'+cmt.text.substring(0,200)+'\n닉네임있으면"○○님!"시작. JSON만:{"reply":"..."}');
+      await sleep(1500);var rRaw=await callGemini('한국 시니어 유튜브 채널 댓글 관리자. 대댓글 1개.\n말투:'+a.recommendedStyle+'/3~4문장/한국어\n'+(chn?'채널:'+chn+'\n':'')+(a.isTroll?'악성도'+a.trollLevel+'\n':'')+'[영상]'+script.substring(0,300)+'\n[댓글@'+cmt.author+']'+cmt.text.substring(0,200)+'\n닉네임있으면"○○님!"시작. JSON만:{"reply":"..."}');
       var rep=JSON.parse(safeJSON(rRaw));
       bulkResults.push({cmt:cmt,reply:rep.reply||'',ok:true});
       repliedSet.add(cmt.id);
@@ -910,7 +910,7 @@ async function startBulk() {
     document.getElementById('pfill').style.width=(done/targets.length*100)+'%';
     var ela=(Date.now()-start)/1000, eta=Math.round((ela/done)*(targets.length-done));
     document.getElementById('peta').textContent=done<targets.length?'남은 시간 약 '+eta+'초':'완료!';
-    if(i<targets.length-1) await sleep(800);
+    if(i<targets.length-1) await sleep(3000);
   }
   bulkRunning=false;
   btn.classList.remove('loading'); btn.disabled=false;
