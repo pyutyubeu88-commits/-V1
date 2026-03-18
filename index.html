@@ -374,7 +374,7 @@ Google 로그인</button>
 <script>
 var GEMINI_MODEL='gemini-2.5-flash-lite';
 var GEMINI_API_VER='v1beta';
-var BULK_DELAY=4000;
+var BULK_DELAY=8000;
 var SITE_URL='https://auto-delta-five.vercel.app';
 
 var ytKey=localStorage.getItem('_yk')||'';
@@ -548,9 +548,14 @@ async function callGemini(prompt){
   return data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts?data.candidates[0].content.parts[0].text||'':'';
 }
 function safeJSON(raw){
-  var s=raw.replace(/```json|```/gi,'').trim();
+  var s=raw.replace(/```json|```/gi,'').replace(/[\x00-\x1F\x7F]/g,function(c){return c==='\n'||c==='\r'||c==='\t'?c:'';}).trim();
   var a=s.search(/[{[]/),b=Math.max(s.lastIndexOf('}'),s.lastIndexOf(']'));
-  if(a<0||b<0)throw new Error('JSON 파싱 실패');return s.slice(a,b+1);
+  if(a<0||b<0)throw new Error('JSON 파싱 실패');
+  var json=s.slice(a,b+1);
+  try{JSON.parse(json);return json;}catch(e){
+    json=json.replace(/,\s*}/g,'}').replace(/,\s*]/g,']').replace(/'/g,'"').replace(/(\w+)\s*:/g,'"$1":');
+    return json;
+  }
 }
 
 function resetAnalysis(){analysis=null;document.getElementById('abox').classList.remove('on');document.getElementById('trollBox').classList.remove('on');}
@@ -679,11 +684,9 @@ async function startBulk(){
     var cmt=targets[i];
     document.getElementById('plog').textContent='@'+cmt.author+' ('+(i+1)+'/'+targets.length+')';
     try{
-      var aRaw=await callGemini('유튜브 댓글 분석 JSON만:\n"'+cmt.text.substring(0,200)+'"\n{"type":"general","typeLabel":"일반댓글","emotion":"긍정","emotionEmoji":"😊","recommendedStyle":"따뜻한 존댓말","isTroll":false,"trollLevel":0}');
-      var a=JSON.parse(safeJSON(aRaw));await sleep(2000);
-      var rRaw=await callGemini('한국 시니어 유튜브 대댓글 1개.\n말투:'+a.recommendedStyle+'/3~4문장\n'+(chn?'채널:'+chn+'\n':'')+'[영상]'+script.substring(0,300)+'\n[@'+cmt.author+']'+cmt.text.substring(0,200)+'\n닉네임→"○○님!"시작. JSON만:{"reply":"..."}');
-      var rep=JSON.parse(safeJSON(rRaw));
-      bulkResults.push({cmt:cmt,reply:rep.reply||'',ok:true,posted:false});
+                var rRaw=await callGemini('한국 시니어 유튜브 채널 댓글 관리자.\n댓글을 분석하고 최적의 대댓글 1개를 작성하세요.\n규칙: 3~4문장, 한국어, 따뜻한 말투\n'+(chn?'채널:'+chn+'\n':'')+'[영상]'+script.substring(0,300)+'\n[댓글 작성자: '+cmt.author+']\n'+cmt.text.substring(0,200)+'\n반드시 "'+cmt.author+'님!" 으로 시작하세요. 절대 OO님이나 ○○님으로 쓰지 마세요.\nJSON만 반환:{"reply":"대댓글 내용"}');
+
+
       repliedSet.add(cmt.id);localStorage.setItem('_rs',JSON.stringify([...repliedSet]));
     }catch(e){bulkResults.push({cmt:cmt,reply:'오류: '+e.message,ok:false,posted:false});}
     var done=i+1;
