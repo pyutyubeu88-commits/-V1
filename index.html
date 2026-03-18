@@ -481,6 +481,20 @@ function callGemini(prompt){
 /* ========= SAFE JSON PARSE ========= */
 function safeJSON(raw){
   if(!raw)return null;
+  raw=raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+  raw=raw.replace(/[\x00-\x1F]/g,' ');
+  try{return JSON.parse(raw);}catch(e){}
+  var m=raw.match(/\{[\s\S]*\}/);
+  if(m){
+    try{return JSON.parse(m[0]);}catch(e){}
+    var c=m[0].replace(/,\s*([}\]])/g,'$1').replace(/'/g,'"').replace(/(\w+)\s*:/g,'"$1":');
+    try{return JSON.parse(c);}catch(e){}
+  }
+  m=raw.match(/\[[\s\S]*\]/);
+  if(m){try{return JSON.parse(m[0]);}catch(e){}}
+  return null;
+}
+  if(!raw)return null;
   // Remove markdown code fences
   raw=raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
   // Try direct parse
@@ -538,11 +552,21 @@ function generate(){
   var author=getAuthor();
   var a=lastAnalysis||{recommendedStyle:'따뜻한',isTroll:false,trollLevel:0,typeLabel:'일반'};
 
-  var prompt='한국 시니어 유튜브 채널 댓글 관리자. 대댓글 3가지.\n말투:'+a.recommendedStyle+'/4~5문장/한국어\n'
-    +(chn?'채널:'+chn+' (서명)\n':'')+(a.isTroll?'⚠️악성도'+a.trollLevel+'\n':'')
-    +'\n[영상]\n'+(script?script.substring(0,600):'(영상 정보 없음)')+'\n\n[댓글-'+a.typeLabel+', 작성자: '+author+']\n'+cmt
-    +'\n\n반드시 "'+author+'님!" 으로 시작하세요. OO님 또는 ○○님은 절대 금지. JSON만:'
-    +'{"replies":[{"label":"감성형","tag":"1","text":"..."},{"label":"정보형","tag":"2","text":"..."},{"label":"소통형","tag":"3","text":"..."}]}';
+  var prompt='너는 한국 시니어 유튜브 채널의 댓글 관리자야.\n'
+      +'아래 댓글에 대한 대댓글 3가지를 만들어줘.\n'
+      +'규칙:\n'
+      +'- 각 대댓글은 4~5문장, 한국어, '+a.recommendedStyle+' 말투\n'
+      +'- 반드시 "'+author+'님!" 으로 시작할 것\n'
+      +'- OO님, ○○님 사용 금지\n'
+      +(chn?'- 마지막에 "- '+chn+'" 서명 포함\n':'')
+      +(a.isTroll?'- 악성 댓글(레벨'+a.trollLevel+'), 침착하게 대응\n':'')
+      +'\n영상 내용: '+(script?script.substring(0,400):'(없음)')
+      +'\n댓글 작성자: '+author
+      +'\n댓글 내용: '+cmt
+      +'\n\n반드시 아래 JSON 형식으로만 응답하고 다른 텍스트는 절대 포함하지 마:\n'
+      +'```json\n'
+      +'{"replies":[{"label":"감성형","text":"내용"},{"label":"정보형","text":"내용"},{"label":"소통형","text":"내용"}]}\n'
+      +'```';
 
   callGemini(prompt).then(function(raw){
     var d=safeJSON(raw);
